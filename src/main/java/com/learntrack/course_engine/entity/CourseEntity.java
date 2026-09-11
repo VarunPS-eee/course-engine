@@ -53,6 +53,9 @@ public class CourseEntity {
     public Long getVersion() {
         return version;
     }
+    public void setEnrolledCount(int enrolledCount) {
+        this.enrolledCount = enrolledCount;
+    }
 
 
 }

@@ -1,12 +1,13 @@
 package com.learntrack.course_engine.exception;
 
 import io.github.resilience4j.ratelimiter.RequestNotPermitted;
+
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-
 import java.net.URI;
 import java.time.Instant;
 
@@ -44,4 +45,14 @@ public class GlobalExceptionHandler {
         problem.setProperty("timestamp", Instant.now());
         return problem;
     }
+    @ExceptionHandler(DataIntegrityViolationException.class)
+public ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+        HttpStatus.CONFLICT,
+        "A resource with this ID already exists or violates a database constraint."
+    );
+    problem.setTitle("Duplicate Resource Conflict");
+    problem.setProperty("timestamp", Instant.now());
+    return problem;
+}
 }

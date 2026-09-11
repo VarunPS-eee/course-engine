@@ -1,33 +1,36 @@
 package com.learntrack.course_engine.service;
 
-import org.springframework.stereotype.Service;
-
 import com.learntrack.course_engine.entity.CourseEntity;
 import com.learntrack.course_engine.repository.CourseRepository;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-
-@Service 
+@Service
 public class EnrollmentService {
+
     private final CourseRepository courseRepository;
 
-    //Contructor Injection
-    public EnrollmentService(CourseRepository courseRepository)
-    {
-        this.courseRepository=courseRepository;
+    // Notice: Clean constructor injection with NO Redisson dependency
+    public EnrollmentService(CourseRepository courseRepository) {
+        this.courseRepository = courseRepository;
     }
 
-    public CourseEntity createCourse(CourseEntity course)
-    {
+    public CourseEntity createCourse(CourseEntity course) {
         return courseRepository.save(course);
     }
-    public CourseEntity enrollStudent(String courseId)
-    {
-        CourseEntity course= courseRepository.findById(courseId)
-            .orElseThrow(() -> new IllegalArgumentException("Course not found with ID : "+ courseId));
 
-            course.enroll();
+    @Transactional
+    @RateLimiter(name = "enrollmentRateLimiter")
+    public CourseEntity enrollStudent(String courseId) {
+        CourseEntity course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new IllegalArgumentException("Course not found with ID: " + courseId));
 
-            return courseRepository.save(course);
+        if (course.getEnrolledCount() >= course.getCapacity()) {
+            throw new IllegalStateException("Course capacity reached");
+        }
 
+        course.setEnrolledCount(course.getEnrolledCount() + 1);
+        return courseRepository.save(course);
     }
 }

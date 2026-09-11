@@ -1,0 +1,32 @@
+package com.learntrack.course_engine.config;
+
+import org.redisson.Redisson;
+import org.redisson.api.RRateLimiter;
+import org.redisson.api.RateIntervalUnit;
+import org.redisson.api.RateType;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.Config;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class RedisRateLimiterConfig {
+
+    @Bean
+    public RedissonClient redissonClient() {
+        Config config = new Config();
+        config.useSingleServer()
+              .setAddress("redis://127.0.0.1:6379")
+              .setConnectionMinimumIdleSize(1)
+              .setConnectTimeout(2000);
+        return Redisson.create(config);
+    }
+
+    @Bean
+    public RRateLimiter enrollmentRateLimiter(RedissonClient redissonClient) {
+        RRateLimiter rateLimiter = redissonClient.getRateLimiter("enrollment_limiter");
+        // Force set rate: 5 requests per 1 second
+        rateLimiter.setRate(RateType.OVERALL, 5, 1, RateIntervalUnit.SECONDS);
+        return rateLimiter;
+    }
+}
