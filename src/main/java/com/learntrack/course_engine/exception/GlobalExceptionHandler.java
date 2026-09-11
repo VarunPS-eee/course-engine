@@ -1,5 +1,6 @@
 package com.learntrack.course_engine.exception;
 
+import io.github.resilience4j.ratelimiter.RequestNotPermitted;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
@@ -28,6 +29,18 @@ public class GlobalExceptionHandler {
     public ProblemDetail handleIllegalState(IllegalStateException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         problem.setTitle("Invalid Request");
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
+    // Handles Resilience4j Rate Limit Exceptions -> HTTP 429
+    @ExceptionHandler(RequestNotPermitted.class)
+    public ProblemDetail handleRateLimitExceeded(RequestNotPermitted ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+            HttpStatus.TOO_MANY_REQUESTS, 
+            "Rate limit exceeded. Maximum 5 requests allowed per second on enrollment."
+        );
+        problem.setTitle("Rate Limit Exceeded");
         problem.setProperty("timestamp", Instant.now());
         return problem;
     }
