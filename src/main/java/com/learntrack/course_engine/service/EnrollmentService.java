@@ -4,6 +4,9 @@ import com.learntrack.course_engine.entity.CourseEntity;
 import com.learntrack.course_engine.event.CourseWaitlistEvent;
 import com.learntrack.course_engine.repository.CourseRepository;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,8 +16,9 @@ import java.util.UUID;
 public class EnrollmentService {
 
     private final CourseRepository courseRepository;
-private final WaitlistPublisher waitlistPublisher;
-  public EnrollmentService(CourseRepository courseRepository, WaitlistPublisher waitlistPublisher) {
+    private final WaitlistPublisher waitlistPublisher;
+
+    public EnrollmentService(CourseRepository courseRepository, WaitlistPublisher waitlistPublisher) {
         this.courseRepository = courseRepository;
         this.waitlistPublisher = waitlistPublisher;
     }
@@ -25,6 +29,11 @@ private final WaitlistPublisher waitlistPublisher;
 
     @Transactional
     @RateLimiter(name = "enrollmentRateLimiter")
+    @Retryable(
+        retryFor = { ObjectOptimisticLockingFailureException.class },
+        maxAttempts = 10,
+        backoff = @Backoff(delay = 50, maxDelay = 200, multiplier = 1.5)
+    )
     public EnrollmentResult enrollStudent(String courseId) {
         CourseEntity course = courseRepository.findById(courseId)
                 .orElseThrow(() -> new IllegalArgumentException("Course not found with ID: " + courseId));
@@ -33,10 +42,9 @@ private final WaitlistPublisher waitlistPublisher;
             String studentId = "STD-" + UUID.randomUUID().toString().substring(0, 8);
             CourseWaitlistEvent event = new CourseWaitlistEvent(courseId, studentId, System.currentTimeMillis());
 
-           
-            // Delegates to DevWaitlistPublisher in dev profile, or RabbitMQWaitlistPublisher otherwise
             waitlistPublisher.publishWaitlistEvent(event);
-            return new EnrollmentResult(false, "Course full. Added to RabbitMQ waitlist queue.", course);
+
+            return new EnrollmentResult(false, "Course full. Added to waitlist queue.", course);
         }
 
         course.setEnrolledCount(course.getEnrolledCount() + 1);

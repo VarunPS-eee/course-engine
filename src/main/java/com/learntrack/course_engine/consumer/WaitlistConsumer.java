@@ -1,17 +1,36 @@
 package com.learntrack.course_engine.consumer;
 
-import com.learntrack.course_engine.config.RabbitMQConfig;
+import com.learntrack.course_engine.entity.WaitlistEntry;
 import com.learntrack.course_engine.event.CourseWaitlistEvent;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import com.learntrack.course_engine.repository.WaitlistRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
-@ConditionalOnProperty(name = "spring.rabbitmq.enabled", havingValue = "true", matchIfMissing = true)
 public class WaitlistConsumer {
 
-	@RabbitListener(queues = RabbitMQConfig.WAITLIST_QUEUE)
-	public void processWaitlistMessage(CourseWaitlistEvent event) {
-		System.out.printf("🐰 [RabbitMQ Listener] Received waitlist message for Student %s on Course %s%n", event.studentId(), event.courseId());
-	}
+    private static final Logger log = LoggerFactory.getLogger(WaitlistConsumer.class);
+
+    private final WaitlistRepository waitlistRepository;
+
+    public WaitlistConsumer(WaitlistRepository waitlistRepository) {
+        this.waitlistRepository = waitlistRepository;
+    }
+
+    @Async
+    @EventListener
+    @Transactional
+    public void processWaitlistMessage(CourseWaitlistEvent event) {
+        log.info("🐰 [Waitlist Consumer] Processing waitlist entry for Student {} on Course {}",
+                event.studentId(), event.courseId());
+
+        WaitlistEntry entry = new WaitlistEntry(event.courseId(), event.studentId());
+        WaitlistEntry saved = waitlistRepository.save(entry);
+
+        log.info("✅ [Waitlist Consumer] Persisted Waitlist Entry ID #{} into Database (Status: PENDING)", saved.getId());
+    }
 }

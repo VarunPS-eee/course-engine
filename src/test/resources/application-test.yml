@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: course-engine
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
+
+resilience4j:
+  ratelimiter:
+    instances:
+      enrollmentRateLimiter:
+        limitForPeriod: 100
+        limitRefreshPeriod: 1s
+        timeoutDuration: 500ms
